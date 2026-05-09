@@ -15,7 +15,6 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # 2. Khởi tạo Model Gemini 1.5 Flash
 SYSTEM_PROMPT = "Bạn là trợ lý dạy Toán của thầy Hùng. Hãy nhìn ảnh học sinh gửi và hướng dẫn giải chi tiết."
 model = genai.GenerativeModel("gemini-1.5-flash")
-
 # Hàm nạp tài liệu PDF từ thư mục data
 def load_knowledge():
     folder = "data"
