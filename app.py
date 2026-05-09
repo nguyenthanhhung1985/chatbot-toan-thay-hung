@@ -30,7 +30,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 # Tạo thư mục data nếu chưa có để bạn bỏ file PDF vào
 if not os.path.exists("data"):
-    os.makedirs("data")
+    os.makedirs("dữ liệu")
 
 # Giao diện Sidebar
 st.sidebar.title("💎 Quản lý học tập")
@@ -41,7 +41,7 @@ st.sidebar.divider()
 @st.cache_resource
 def load_data_files():
     data_files = []
-    folder = "data"
+    folder = "dữ liệu"
     for filename in os.listdir(folder):
         if filename.endswith(".pdf"):
             path = os.path.join(folder, filename)
@@ -55,7 +55,7 @@ knowledge_base = load_data_files()
 if knowledge_base:
     st.sidebar.success(f"✅ Đã nạp {len(knowledge_base)} tài liệu SGK/Đề thi.")
 else:
-    st.sidebar.warning("⚠️ Chưa có file PDF nào trong thư mục 'data'.")
+    st.sidebar.warning("⚠️ Chưa có file PDF nào trong thư mục 'dữ liệu'.")
 
 # --- Khởi tạo mô hình AI ---
 model = genai.GenerativeModel(
