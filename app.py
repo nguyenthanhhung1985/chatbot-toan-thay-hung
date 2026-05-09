@@ -5,187 +5,170 @@ import time
 from PIL import Image
 
 # =====================================================
-# PAGE CONFIG
+# CẤU HÌNH TRANG
 # =====================================================
-
 st.set_page_config(
-    page_title="Gia sư Toán AI",
-    page_icon="🤖",
+    page_title="Gia sư Toán AI - Thầy Hùng",
+    page_icon="🎓",
     layout="centered"
 )
 
 # =====================================================
-# CSS
+# GIAO DIỆN CSS TÙY CHỈNH
 # =====================================================
-
 st.markdown("""
 <style>
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
-h1 {
-    text-align: center;
-    color: #0E1117;
-}
-.stChatMessage {
-    border-radius: 10px;
-}
+    .main {
+        background-color: #f5f7f9;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 5px;
+        height: 3em;
+        background-color: #ff4b4b;
+        color: white;
+    }
+    .stChatMessage {
+        background-color: white;
+        border-radius: 15px;
+        padding: 15px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    h1 {
+        color: #1E1E1E;
+        text-align: center;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================
-# API KEY CONFIGURATION
+# QUẢN LÝ API KEY
 # =====================================================
+def get_api_key():
+    # 1. Thử lấy từ Streamlit Secrets (Dành cho Streamlit Cloud)
+    if "GOOGLE_API_KEY" in st.secrets:
+        return st.secrets["GOOGLE_API_KEY"]
+    # 2. Thử lấy từ biến môi trường (Dành cho Local/Docker)
+    if os.getenv("GOOGLE_API_KEY"):
+        return os.getenv("GOOGLE_API_KEY")
+    return None
 
-# Ưu tiên lấy từ secrets, nếu không có thì lấy từ biến môi trường
-api_key = None
-if "GOOGLE_API_KEY" in st.secrets:
-    api_key = st.secrets["GOOGLE_API_KEY"]
-elif os.getenv("GOOGLE_API_KEY"):
-    api_key = os.getenv("GOOGLE_API_KEY")
+api_key = get_api_key()
 
 if not api_key:
-    st.warning("⚠️ Chưa tìm thấy GOOGLE_API_KEY trong secrets hoặc biến môi trường.")
-    api_key = st.text_input("Vui lòng nhập Gemini API Key của bạn:", type="password")
-    if not api_key:
-        st.info("💡 Bạn có thể lấy API Key tại [Google AI Studio](https://aistudio.google.com/app/apikey)")
+    st.error("🔑 **Thiếu API Key!**")
+    st.info("Vui lòng thêm `GOOGLE_API_KEY` vào mục **Secrets** trên Streamlit Cloud hoặc nhập dưới đây để dùng tạm:")
+    temp_key = st.text_input("Nhập Gemini API Key:", type="password")
+    if temp_key:
+        api_key = temp_key
+    else:
         st.stop()
 
-# =====================================================
-# GEMINI CONFIG
-# =====================================================
-
+# Cấu hình Gemini
 genai.configure(api_key=api_key)
 
 # =====================================================
-# SYSTEM PROMPT
+# CẤU HÌNH MODEL
 # =====================================================
-
 SYSTEM_PROMPT = """
-Bạn là một Gia sư Toán AI chuyên nghiệp, tận tâm và vui vẻ.
-Nhiệm vụ của bạn:
-1. Giải các bài toán THPT (Toán 10, 11, 12) một cách chi tiết.
-2. Trình bày lời giải từng bước một (step-by-step) rõ ràng.
-3. Sử dụng ngôn ngữ dễ hiểu, phù hợp với học sinh.
-4. Nếu đề bài mờ hoặc thiếu thông tin, hãy yêu cầu học sinh cung cấp thêm.
-5. Luôn khuyến khích học sinh tự suy nghĩ và chỉ ra các lỗi sai thường gặp.
-6. Sử dụng LaTeX để viết công thức toán học cho chuyên nghiệp.
+Bạn là Gia sư Toán AI (Thầy Hùng AI).
+Nhiệm vụ:
+1. Giải toán THPT Việt Nam chi tiết, chính xác.
+2. Trình bày các bước giải rõ ràng, có giải thích lý do tại sao làm bước đó.
+3. Sử dụng ký hiệu LaTeX (ví dụ: $x^2 + y^2 = r^2$) để công thức hiển thị đẹp.
+4. Nếu đề bài là ảnh, hãy đọc kỹ và trích dẫn lại đề bài trước khi giải.
+5. Luôn giữ thái độ thân thiện, khích lệ học sinh.
 """
-
-# =====================================================
-# MODEL INITIALIZATION
-# =====================================================
 
 @st.cache_resource
 def load_model():
     try:
-        # Thử dùng gemini-2.0-flash, nếu lỗi thì fallback về gemini-1.5-flash
-        try:
-            model = genai.GenerativeModel(
-                model_name="gemini-2.0-flash",
-                system_instruction=SYSTEM_PROMPT
-            )
-            # Test thử model
-            model.generate_content("test")
-            return model
-        except Exception:
-            return genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                system_instruction=SYSTEM_PROMPT
-            )
+        return genai.GenerativeModel(
+            model_name="gemini-1.5-flash", # Dùng bản flash để nhanh và ổn định hơn trên cloud
+            system_instruction=SYSTEM_PROMPT
+        )
     except Exception as e:
-        st.error(f"Lỗi khởi tạo model: {e}")
+        st.error(f"Lỗi khởi tạo Model: {e}")
         return None
 
 model = load_model()
-if not model:
-    st.stop()
 
 # =====================================================
-# SESSION STATE
+# QUẢN LÝ TRẠNG THÁI (SESSION STATE)
 # =====================================================
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "chat" not in st.session_state:
-    st.session_state.chat = model.start_chat(history=[])
+if "chat_session" not in st.session_state:
+    if model:
+        st.session_state.chat_session = model.start_chat(history=[])
 
 # =====================================================
-# SIDEBAR
+# THANH BÊN (SIDEBAR)
 # =====================================================
-
 with st.sidebar:
-    st.title("⚙️ Cấu hình")
+    st.image("https://cdn-icons-png.flaticon.com/512/3426/3426653.png", width=100)
+    st.title("Gia sư Toán AI")
+    st.markdown("---")
     
-    mode = st.selectbox(
-        "Chế độ phản hồi",
-        ["Giải chi tiết", "Gợi ý hướng làm", "Chỉ đưa ra đáp số"]
+    mode = st.radio(
+        "Chế độ học tập:",
+        ["Giải chi tiết", "Gợi ý cách làm", "Kiểm tra đáp án"]
     )
     
-    st.divider()
-    
-    if st.button("🗑️ Xóa lịch sử trò chuyện", use_container_width=True):
+    if st.button("🗑️ Xóa lịch sử"):
         st.session_state.messages = []
-        st.session_state.chat = model.start_chat(history=[])
+        st.session_state.chat_session = model.start_chat(history=[])
         st.rerun()
+    
+    st.markdown("---")
+    st.caption("Phiên bản 2.0 - Tối ưu cho Streamlit Cloud")
 
 # =====================================================
-# MAIN UI
+# GIAO DIỆN CHÍNH
 # =====================================================
+st.title("🎓 Gia sư Toán AI (Thầy Hùng)")
+st.write("Gửi ảnh đề bài hoặc nhập câu hỏi toán học của bạn bên dưới.")
 
-st.title("🤖 Gia sư Toán AI")
-st.markdown("Chào mừng bạn! Hãy gửi đề bài bằng hình ảnh hoặc nhập văn bản bên dưới.")
+# Tải ảnh lên
+uploaded_file = st.file_uploader("📸 Tải lên ảnh đề bài", type=["jpg", "jpeg", "png"])
+input_img = None
 
-# UPLOAD IMAGE
-uploaded_pic = st.file_uploader("📸 Tải lên ảnh bài toán (JPG, PNG)", type=["jpg", "jpeg", "png"])
+if uploaded_file:
+    input_img = Image.open(uploaded_file)
+    st.image(input_img, caption="Đề bài bạn đã gửi", use_container_width=True)
 
-img = None
-if uploaded_pic:
-    try:
-        img = Image.open(uploaded_pic)
-        st.image(img, caption="Ảnh bài toán đã tải lên", use_container_width=True)
-    except Exception as e:
-        st.error(f"Lỗi khi đọc file ảnh: {e}")
+# Hiển thị lịch sử chat
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# DISPLAY CHAT HISTORY
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-# CHAT INPUT
-if prompt := st.chat_input("Nhập câu hỏi của bạn ở đây..."):
-    # Hiển thị tin nhắn người dùng
+# Nhập liệu từ người dùng
+if prompt := st.chat_input("Bạn muốn hỏi gì về bài toán này?"):
+    
+    # Lưu tin nhắn người dùng
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-
-    # Xử lý phản hồi từ AI
+    
+    # AI trả lời
     with st.chat_message("assistant"):
-        with st.spinner("🧠 Đang suy nghĩ..."):
+        with st.spinner("Thầy đang suy nghĩ..."):
             try:
-                # Chuẩn bị nội dung gửi đi
-                full_prompt = f"Chế độ: {mode}\n\nCâu hỏi: {prompt}"
-                content_to_send = [full_prompt]
-                if img:
-                    content_to_send.append(img)
+                full_prompt = f"Chế độ: {mode}\nCâu hỏi: {prompt}"
                 
-                # Gửi tin nhắn
-                response = st.session_state.chat.send_message(
-                    content_to_send,
-                    generation_config={
-                        "temperature": 0.4,
-                        "max_output_tokens": 2048
-                    }
-                )
+                # Chuẩn bị nội dung gửi đi (Text + Image nếu có)
+                request_content = [full_prompt]
+                if input_img:
+                    request_content.append(input_img)
                 
-                answer = response.text
-                st.markdown(answer)
+                response = st.session_state.chat_session.send_message(request_content)
+                ai_response = response.text
                 
-                # Lưu vào lịch sử
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.markdown(ai_response)
+                st.session_state.messages.append({"role": "assistant", "content": ai_response})
                 
             except Exception as e:
-                st.error(f"❌ Có lỗi xảy ra: {e}")
-                st.info("Gợi ý: Kiểm tra lại kết nối internet hoặc API Key.")
+                st.error(f"❌ Lỗi: {e}")
+                st.info("Thử lại hoặc kiểm tra API Key của bạn.")
