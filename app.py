@@ -1,101 +1,79 @@
 import streamlit as st
 import google.generativeai as genai
 import os
-import pandas as pd
-from datetime import datetime
+from PIL import Image
 
-# ==========================================
-# PHẦN 1: THÔNG TIN CÁ NHÂN (CẦN THAY THẾ)
-# ==========================================
-# [VỊ TRÍ 1]: Thay bằng API Key lấy từ Google AI Studio
+# 1. Cấu hình bảo mật từ Secrets
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-
-# [VỊ TRÍ 2]: Cấu hình tính cách của Chatbot (System Instruction)
-SYSTEM_PROMPT = """
-Bạn là Trợ lý học tập môn Toán của Thầy [THẦY HƯNG].
-Nhiệm vụ của bạn là hỗ trợ học sinh học tập theo bộ sách [KẾT NỐI TRI THỨC].
-
-QUY TẮC SƯ PHẠM:
-1. KHÔNG BAO GIỜ cho đáp án trực tiếp.
-2. Nếu học sinh hỏi đáp án, hãy nói: "Thầy muốn em tự tư duy một chút, hãy thử gợi ý này nhé..."
-3. Luôn sử dụng định dạng LaTeX cho công thức toán (ví dụ: $x^2 + y^2 = r^2$).
-4. Nếu có nạp file PDF, hãy ưu tiên trích dẫn kiến thức từ file đó.
-"""
-
-# ==========================================
-# PHẦN 2: CẤU HÌNH HỆ THỐNG
-# ==========================================
-st.set_page_config(page_title="Gia sư Toán AI", page_icon="📐", layout="centered")
 genai.configure(api_key=GOOGLE_API_KEY, transport='rest')
 
-# Tạo thư mục data nếu chưa có để bạn bỏ file PDF vào
-if not os.path.exists("data"):
-    os.makedirs("data")
+# 2. Thiết lập Model
+SYSTEM_PROMPT = """Bạn là trợ lý dạy Toán chuyên nghiệp của thầy Hùng. 
+Khi học sinh gửi ảnh đề bài hoặc câu hỏi:
+1. Đọc kỹ nội dung toán học trong ảnh.
+2. Hướng dẫn từng bước giải dựa trên kiến thức sách giáo khoa.
+3. Tuyệt đối không cho ngay đáp án cuối cùng nếu học sinh chưa hiểu cách làm.
+4. Xưng hô thân thiện, truyền cảm hứng."""
 
-# Giao diện Sidebar
-st.sidebar.title("💎 Quản lý học tập")
-hoc_sinh = st.sidebar.text_input("Nhập tên học sinh:", value="Học sinh ẩn danh")
-st.sidebar.divider()
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction=SYSTEM_PROMPT
+)
 
-# --- Hàm nạp tài liệu PDF ---
-@st.cache_resource
+# Hàm nạp tài liệu PDF từ thư mục data
 def load_data_files():
-    data_files = []
     folder = "data"
+    if not os.path.exists(folder):
+        return []
+    files = []
     for filename in os.listdir(folder):
         if filename.endswith(".pdf"):
             path = os.path.join(folder, filename)
-            # Tải file lên Gemini (Miễn phí)
             file_gen = genai.upload_file(path=path)
-            data_files.append(file_gen)
-    return data_files
+            files.append(file_gen)
+    return files
 
-knowledge_base = load_data_files()
+# Giao diện Streamlit
+st.set_page_config(page_title="Gia sư Toán AI - Thầy Hùng", layout="wide")
+st.title("💎 Quản lý học tập & Hỗ trợ giải toán")
 
-if knowledge_base:
-    st.sidebar.success(f"✅ Đã nạp {len(knowledge_base)} tài liệu SGK/Đề thi.")
-else:
-    st.sidebar.warning("⚠️ Chưa có file PDF nào trong thư mục 'data'.")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# --- Khởi tạo mô hình AI ---
-model = genai.GenerativeModel("gemini-1.5-flash"),
-system_instruction=SYSTEM_PROMPT
+# Nạp dữ liệu kiến thức (chỉ chạy 1 lần)
+if "knowledge_base" not in st.session_state:
+    with st.spinner("Đang kết nối thư viện sách giáo khoa..."):
+        st.session_state.knowledge_base = load_data_files()
 
-# --- Quản lý lịch sử Chat ---
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+st.sidebar.success(f"📚 Đã sẵn sàng {len(st.session_state.knowledge_base)} tài liệu bổ trợ.")
+
+# --- TÍNH NĂNG CHỤP ẢNH ---
+st.sidebar.header("📸 Tải ảnh đề bài")
+uploaded_file = st.sidebar.file_uploader("Chụp hoặc chọn ảnh bài tập", type=["jpg", "jpeg", "png"])
+
+if uploaded_file:
+    img = Image.open(uploaded_file)
+    st.sidebar.image(img, caption="Ảnh đã tải lên", use_container_width=True)
 
 # Hiển thị lịch sử chat
-for message in st.session_state.messages:
+for message in st.session_state.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- Xử lý câu hỏi của học sinh ---
-if prompt := st.chat_input("Em muốn hỏi bài tập nào?"):
-    # Hiển thị câu hỏi của HS
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# Xử lý tin nhắn và hình ảnh
+if prompt := st.chat_input("Em muốn hỏi gì về bài tập này?"):
+    st.session_state.chat_history.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Gửi câu hỏi đến AI
     with st.chat_message("assistant"):
-        # Kết hợp tài liệu và câu hỏi
-        input_data = knowledge_base + [prompt]
-        response = model.generate_content(input_data)
-        full_response = response.text
-        st.markdown(full_response)
-        
-    # Lưu vào lịch sử
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
-
-    # [VỊ TRÍ 3]: NHẬT KÝ GIẢNG DẠY (Ghi lại để thầy theo dõi)
-    # Tạm thời lưu vào file CSV để miễn phí và đơn giản. 
-    # Khi dùng Streamlit Cloud, bạn có thể tải file này về xem.
-    log_data = {
-        "Thời gian": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-        "Học sinh": [hoc_sinh],
-        "Câu hỏi": [prompt],
-        "AI trả lời": [full_response[:100] + "..."] # Lưu ngắn gọn
-    }
-    df = pd.DataFrame(log_data)
-    df.to_csv("nhat_ky_hoc_tap.csv", mode='a', index=False, header=not os.path.exists("nhat_ky_hoc_tap.csv"))
+        with st.spinner("Thầy đang xem bài..."):
+            # Nếu có ảnh, gửi kèm ảnh cho AI
+            if uploaded_file:
+                content = [prompt, img, *st.session_state.knowledge_base]
+            else:
+                content = [prompt, *st.session_state.knowledge_base]
+            
+            response = model.generate_content(content)
+            st.markdown(response.text)
+            st.session_state.chat_history.append({"role": "assistant", "content": response.text})
