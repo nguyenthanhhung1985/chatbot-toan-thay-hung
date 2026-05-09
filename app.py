@@ -55,7 +55,7 @@ knowledge_base = load_data_files()
 if knowledge_base:
     st.sidebar.success(f"✅ Đã nạp {len(knowledge_base)} tài liệu SGK/Đề thi.")
 else:
-    st.sidebar.warning("⚠️ Chưa có file PDF nào trong thư mục 'dữ liệu'.")
+    st.sidebar.warning("⚠️ Chưa có file PDF nào trong thư mục 'data'.")
 
 # --- Khởi tạo mô hình AI ---
 model = genai.GenerativeModel(
