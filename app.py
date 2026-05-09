@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# CUSTOM CSS
+# CSS
 # =========================================================
 
 st.markdown("""
@@ -50,7 +50,7 @@ except Exception:
     st.stop()
 
 # =========================================================
-# CONFIGURE GEMINI
+# GEMINI CONFIG
 # =========================================================
 
 genai.configure(api_key=GOOGLE_API_KEY)
@@ -65,16 +65,11 @@ Bạn là Gia sư Toán AI của thầy Hùng.
 Nhiệm vụ:
 - Giải toán THPT chi tiết từng bước
 - Giải thích dễ hiểu
-- Không bỏ qua lập luận quan trọng
+- Không bỏ bước quan trọng
 - Nếu học sinh gửi ảnh thì đọc và phân tích đề
 - Nếu học sinh làm sai thì chỉ ra lỗi sai
 - Ưu tiên cách giải ngắn gọn
-- Trình bày đẹp, rõ ràng
-
-Khi trình bày:
-- Chia theo từng bước
-- Viết rõ kết luận
-- Nếu có nhiều cách thì ưu tiên cách nhanh
+- Trình bày đẹp và rõ ràng
 """
 
 # =========================================================
@@ -112,7 +107,7 @@ def load_knowledge():
         if f.endswith(".pdf")
     ]
 
-    # Giới hạn tối đa 3 PDF
+    # Giới hạn tối đa 3 file PDF
     pdf_files = pdf_files[:3]
 
     for file in pdf_files:
@@ -127,7 +122,7 @@ def load_knowledge():
 
         except Exception as e:
 
-            st.warning(f"⚠️ Lỗi PDF {file}: {e}")
+            st.warning(f"⚠️ Lỗi file PDF {file}: {e}")
 
     return docs
 
@@ -263,10 +258,7 @@ Câu hỏi học sinh:
 {prompt}
 """
 
-    # -----------------------------------------------------
     # USER MESSAGE
-    # -----------------------------------------------------
-
     st.session_state.messages.append({
         "role": "user",
         "content": prompt
@@ -276,10 +268,7 @@ Câu hỏi học sinh:
 
         st.markdown(prompt)
 
-    # -----------------------------------------------------
     # AI RESPONSE
-    # -----------------------------------------------------
-
     with st.chat_message("assistant"):
 
         with st.spinner("📚 Thầy đang giải bài..."):
@@ -298,7 +287,7 @@ Câu hỏi học sinh:
                         st.session_state.docs
                     )
 
-                # chat memory
+                # gửi Gemini
                 response = (
                     st.session_state.chat
                     .send_message(content)
@@ -306,6 +295,7 @@ Câu hỏi học sinh:
 
                 answer = response.text
 
+                # hiển thị
                 st.markdown(answer)
 
                 # lưu lịch sử
@@ -322,9 +312,9 @@ Câu hỏi học sinh:
 {e}
 
 💡 Gợi ý:
-- Kiểm tra API KEY
+- Kiểm tra GOOGLE_API_KEY
 - Kiểm tra quota Gemini
-- Kiểm tra kích thước ảnh
+- Giảm kích thước ảnh
 - Kiểm tra file PDF
 """
 
