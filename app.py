@@ -26,7 +26,7 @@ QUY TẮC SƯ PHẠM:
 # PHẦN 2: CẤU HÌNH HỆ THỐNG
 # ==========================================
 st.set_page_config(page_title="Gia sư Toán AI", page_icon="📐", layout="centered")
-genai.configure(api_key=GOOGLE_API_KEY)
+genai.configure(api_key=GOOGLE_API_KEY, transport='rest')
 
 # Tạo thư mục data nếu chưa có để bạn bỏ file PDF vào
 if not os.path.exists("data"):
@@ -58,9 +58,8 @@ else:
     st.sidebar.warning("⚠️ Chưa có file PDF nào trong thư mục 'data'.")
 
 # --- Khởi tạo mô hình AI ---
-model = genai.GenerativeModel(model_name="gemini-1.5-flash",
+model = genai.GenerativeModel("gemini-1.5-flash"),
     system_instruction=SYSTEM_PROMPT
-)
 
 # --- Quản lý lịch sử Chat ---
 if "messages" not in st.session_state:
