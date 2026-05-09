@@ -8,7 +8,7 @@ from datetime import datetime
 # PHẦN 1: THÔNG TIN CÁ NHÂN (CẦN THAY THẾ)
 # ==========================================
 # [VỊ TRÍ 1]: Thay bằng API Key lấy từ Google AI Studio
-GOOGLE_API_KEY = "AIzaSyBQVlrHqS7hallRI0q_Mwy8IgqE7w0pT1o"
+GOOGLE_API_KEY = "AIzaSyAVSWpxjfFHGd0AJyJDbq9Q9T63knI9YV4"
 
 # [VỊ TRÍ 2]: Cấu hình tính cách của Chatbot (System Instruction)
 SYSTEM_PROMPT = """
