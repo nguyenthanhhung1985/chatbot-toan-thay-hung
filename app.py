@@ -30,7 +30,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 # Tạo thư mục data nếu chưa có để bạn bỏ file PDF vào
 if not os.path.exists("data"):
-    os.makedirs("dữ liệu")
+    os.makedirs("data")
 
 # Giao diện Sidebar
 st.sidebar.title("💎 Quản lý học tập")
@@ -41,7 +41,7 @@ st.sidebar.divider()
 @st.cache_resource
 def load_data_files():
     data_files = []
-    folder = "dữ liệu"
+    folder = "data"
     for filename in os.listdir(folder):
         if filename.endswith(".pdf"):
             path = os.path.join(folder, filename)
