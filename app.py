@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import os
+import time
 from PIL import Image
 
 # =========================================================
@@ -14,24 +15,24 @@ st.set_page_config(
 )
 
 # =========================================================
-# CSS
+# CUSTOM CSS
 # =========================================================
 
 st.markdown("""
 <style>
 
 .block-container{
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
-
-.stChatMessage{
-    border-radius: 15px;
-    padding: 10px;
+    padding-top:2rem;
+    padding-bottom:2rem;
 }
 
 h1{
     text-align:center;
+}
+
+.stChatMessage{
+    border-radius:15px;
+    padding:10px;
 }
 
 </style>
@@ -64,12 +65,12 @@ Bạn là Gia sư Toán AI của thầy Hùng.
 
 Nhiệm vụ:
 - Giải toán THPT chi tiết từng bước
-- Giải thích dễ hiểu
-- Không bỏ bước quan trọng
-- Nếu học sinh gửi ảnh thì đọc và phân tích đề
+- Trình bày dễ hiểu
+- Không bỏ qua bước quan trọng
 - Nếu học sinh làm sai thì chỉ ra lỗi sai
+- Nếu học sinh gửi ảnh thì phân tích ảnh
 - Ưu tiên cách giải ngắn gọn
-- Trình bày đẹp và rõ ràng
+- Trình bày rõ ràng đẹp mắt
 """
 
 # =========================================================
@@ -79,13 +80,13 @@ Nhiệm vụ:
 try:
 
     model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
+        model_name="gemini-1.5-flash-8b",
         system_instruction=SYSTEM_PROMPT
     )
 
 except Exception as e:
 
-    st.error(f"❌ Lỗi khởi tạo Gemini: {e}")
+    st.error(f"❌ Lỗi khởi tạo Gemini:\n{e}")
     st.stop()
 
 # =========================================================
@@ -107,8 +108,8 @@ def load_knowledge():
         if f.endswith(".pdf")
     ]
 
-    # Giới hạn tối đa 3 file PDF
-    pdf_files = pdf_files[:3]
+    # Chỉ load 1 PDF để giảm quota
+    pdf_files = pdf_files[:1]
 
     for file in pdf_files:
 
@@ -116,13 +117,13 @@ def load_knowledge():
 
             path = os.path.join(folder, file)
 
-            uploaded_file = genai.upload_file(path=path)
+            uploaded = genai.upload_file(path=path)
 
-            docs.append(uploaded_file)
+            docs.append(uploaded)
 
         except Exception as e:
 
-            st.warning(f"⚠️ Lỗi file PDF {file}: {e}")
+            st.warning(f"⚠️ Lỗi PDF {file}: {e}")
 
     return docs
 
@@ -217,6 +218,9 @@ if uploaded_pic:
 
         img = Image.open(uploaded_pic)
 
+        # Resize để giảm quota
+        img = img.resize((800, 800))
+
         st.image(
             img,
             caption="Ảnh đề bài",
@@ -225,7 +229,7 @@ if uploaded_pic:
 
     except Exception as e:
 
-        st.error(f"❌ Lỗi đọc ảnh: {e}")
+        st.error(f"❌ Lỗi đọc ảnh:\n{e}")
 
 # =========================================================
 # SHOW CHAT HISTORY
@@ -254,11 +258,14 @@ if prompt:
     final_prompt = f"""
 Chế độ trả lời: {mode}
 
-Câu hỏi học sinh:
+Câu hỏi:
 {prompt}
 """
 
+    # -----------------------------------------------------
     # USER MESSAGE
+    # -----------------------------------------------------
+
     st.session_state.messages.append({
         "role": "user",
         "content": prompt
@@ -268,7 +275,10 @@ Câu hỏi học sinh:
 
         st.markdown(prompt)
 
-    # AI RESPONSE
+    # -----------------------------------------------------
+    # ASSISTANT RESPONSE
+    # -----------------------------------------------------
+
     with st.chat_message("assistant"):
 
         with st.spinner("📚 Thầy đang giải bài..."):
@@ -277,28 +287,38 @@ Câu hỏi học sinh:
 
                 content = [final_prompt]
 
-                # thêm ảnh
+                # Thêm ảnh nếu có
                 if img:
                     content.append(img)
 
-                # thêm PDF knowledge
-                if len(st.session_state.docs) > 0:
-                    content.extend(
-                        st.session_state.docs
-                    )
+                # Chỉ gửi PDF nếu người dùng hỏi PDF
+                if "pdf" in prompt.lower():
 
-                # gửi Gemini
+                    if len(st.session_state.docs) > 0:
+
+                        content.extend(
+                            st.session_state.docs
+                        )
+
+                # Delay chống spam quota
+                time.sleep(2)
+
                 response = (
                     st.session_state.chat
-                    .send_message(content)
+                    .send_message(
+                        content,
+                        generation_config={
+                            "temperature": 0.3,
+                            "max_output_tokens": 1024
+                        }
+                    )
                 )
 
                 answer = response.text
 
-                # hiển thị
                 st.markdown(answer)
 
-                # lưu lịch sử
+                # Lưu lịch sử
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": answer
@@ -306,21 +326,29 @@ Câu hỏi học sinh:
 
             except Exception as e:
 
-                error_msg = f"""
+                error_text = f"""
 ❌ Đã xảy ra lỗi:
 
 {e}
 
 💡 Gợi ý:
-- Kiểm tra GOOGLE_API_KEY
-- Kiểm tra quota Gemini
+- Chờ 30-60 giây rồi hỏi lại
 - Giảm kích thước ảnh
-- Kiểm tra file PDF
+- Không gửi quá nhiều câu liên tục
+- Kiểm tra quota Gemini
 """
 
-                st.error(error_msg)
+                st.error(error_text)
 
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": error_msg
+                    "content": error_text
                 })
+
+# =========================================================
+# FOOTER
+# =========================================================
+
+st.markdown("---")
+
+st.caption("🚀 Gia sư Toán AI • Streamlit + Gemini")
