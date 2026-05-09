@@ -58,8 +58,7 @@ else:
     st.sidebar.warning("⚠️ Chưa có file PDF nào trong thư mục 'data'.")
 
 # --- Khởi tạo mô hình AI ---
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
+model = genai.GenerativeModel("models/gemini-1.5-flash"),
     system_instruction=SYSTEM_PROMPT
 )
 
