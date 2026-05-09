@@ -59,7 +59,7 @@ else:
 
 # --- Khởi tạo mô hình AI ---
 model = genai.GenerativeModel("gemini-1.5-flash"),
-    system_instruction=SYSTEM_PROMPT
+system_instruction=SYSTEM_PROMPT
 
 # --- Quản lý lịch sử Chat ---
 if "messages" not in st.session_state:
