@@ -10,14 +10,11 @@ except:
     st.error("Lỗi: Thầy chưa cấu hình GOOGLE_API_KEY trong phần Secrets!")
     st.stop()
 
-genai.configure(api_key=GOOGLE_API_KEY, transport='rest')
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # 2. Khởi tạo Model Gemini 1.5 Flash
 SYSTEM_PROMPT = "Bạn là trợ lý dạy Toán của thầy Hùng. Hãy nhìn ảnh học sinh gửi và hướng dẫn giải chi tiết."
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    system_instruction=SYSTEM_PROMPT
-)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # Hàm nạp tài liệu PDF từ thư mục data
 def load_knowledge():
