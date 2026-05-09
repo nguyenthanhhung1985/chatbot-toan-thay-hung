@@ -3,9 +3,9 @@ import google.generativeai as genai
 import os
 from PIL import Image
 
-# =========================
-# CONFIG
-# =========================
+# =========================================================
+# PAGE CONFIG
+# =========================================================
 
 st.set_page_config(
     page_title="Gia sư Toán AI",
@@ -13,79 +13,127 @@ st.set_page_config(
     layout="centered"
 )
 
-# =========================
+# =========================================================
+# CUSTOM CSS
+# =========================================================
+
+st.markdown("""
+<style>
+
+.block-container{
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+.stChatMessage{
+    border-radius: 15px;
+    padding: 10px;
+}
+
+h1{
+    text-align:center;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# =========================================================
 # API KEY
-# =========================
+# =========================================================
 
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-except:
-    st.error("Chưa cấu hình GOOGLE_API_KEY")
+
+except Exception:
+
+    st.error("❌ Chưa cấu hình GOOGLE_API_KEY trong Secrets")
     st.stop()
+
+# =========================================================
+# CONFIGURE GEMINI
+# =========================================================
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# =========================
+# =========================================================
 # SYSTEM PROMPT
-# =========================
+# =========================================================
 
 SYSTEM_PROMPT = """
-Bạn là gia sư Toán THPT của thầy Hùng.
+Bạn là Gia sư Toán AI của thầy Hùng.
 
 Nhiệm vụ:
-- Giải toán chi tiết từng bước
+- Giải toán THPT chi tiết từng bước
 - Giải thích dễ hiểu
-- Trình bày đẹp
-- Ưu tiên phương pháp nhanh
-- Nếu học sinh gửi ảnh thì đọc ảnh
-- Nếu học sinh sai thì chỉ ra lỗi sai
+- Không bỏ qua lập luận quan trọng
+- Nếu học sinh gửi ảnh thì đọc và phân tích đề
+- Nếu học sinh làm sai thì chỉ ra lỗi sai
+- Ưu tiên cách giải ngắn gọn
+- Trình bày đẹp, rõ ràng
 
 Khi trình bày:
-- Dùng ký hiệu toán học
-- Trình bày theo từng bước rõ ràng
+- Chia theo từng bước
+- Viết rõ kết luận
+- Nếu có nhiều cách thì ưu tiên cách nhanh
 """
 
-# =========================
-# MODEL
-# =========================
+# =========================================================
+# LOAD MODEL
+# =========================================================
 
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    system_instruction=SYSTEM_PROMPT
-)
+try:
 
-# =========================
-# LOAD PDF
-# =========================
+    model = genai.GenerativeModel(
+        model_name="gemini-2.0-flash",
+        system_instruction=SYSTEM_PROMPT
+    )
+
+except Exception as e:
+
+    st.error(f"❌ Lỗi khởi tạo Gemini: {e}")
+    st.stop()
+
+# =========================================================
+# LOAD PDF KNOWLEDGE
+# =========================================================
 
 @st.cache_resource
 def load_knowledge():
 
     folder = "data"
 
-    if not os.path.exists(folder):
-        return []
-
     docs = []
 
-    for file in os.listdir(folder):
+    if not os.path.exists(folder):
+        return docs
 
-        if file.endswith(".pdf"):
+    pdf_files = [
+        f for f in os.listdir(folder)
+        if f.endswith(".pdf")
+    ]
+
+    # Giới hạn tối đa 3 PDF
+    pdf_files = pdf_files[:3]
+
+    for file in pdf_files:
+
+        try:
 
             path = os.path.join(folder, file)
 
-            try:
-                uploaded = genai.upload_file(path=path)
-                docs.append(uploaded)
+            uploaded_file = genai.upload_file(path=path)
 
-            except Exception as e:
-                st.warning(f"Lỗi file {file}: {e}")
+            docs.append(uploaded_file)
+
+        except Exception as e:
+
+            st.warning(f"⚠️ Lỗi PDF {file}: {e}")
 
     return docs
 
-# =========================
+# =========================================================
 # SESSION STATE
-# =========================
+# =========================================================
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -99,40 +147,70 @@ if "chat" not in st.session_state:
         history=[]
     )
 
-# =========================
+# =========================================================
+# SIDEBAR
+# =========================================================
+
+with st.sidebar:
+
+    st.title("⚙️ Tuỳ chọn")
+
+    mode = st.selectbox(
+        "Chế độ trả lời",
+        [
+            "Giải chi tiết",
+            "Gợi ý",
+            "Chỉ đáp số"
+        ]
+    )
+
+    st.markdown("---")
+
+    if st.button("🗑️ Xóa hội thoại"):
+
+        st.session_state.messages = []
+
+        st.session_state.chat = model.start_chat(
+            history=[]
+        )
+
+        st.success("Đã xóa hội thoại")
+
+    st.markdown("---")
+
+    st.markdown("""
+### 📚 Chức năng
+
+✅ Giải toán THPT  
+✅ Đọc ảnh bài toán  
+✅ Hỗ trợ PDF  
+✅ Nhớ hội thoại  
+✅ Giải từng bước  
+""")
+
+# =========================================================
 # TITLE
-# =========================
+# =========================================================
 
 st.title("🤖 Gia sư Toán AI")
 
 st.markdown("""
+Xin chào 👋
+
 Em có thể:
 
 - 📸 Gửi ảnh bài toán
-- ✍️ Nhập đề bài
+- ✍️ Nhập đề trực tiếp
 - 📘 Hỏi theo tài liệu PDF
 - 🧠 Hỏi tiếp nhiều câu liên tục
 """)
 
-# =========================
-# MODE
-# =========================
-
-mode = st.selectbox(
-    "Chế độ trả lời",
-    [
-        "Giải chi tiết",
-        "Gợi ý",
-        "Chỉ đáp số"
-    ]
-)
-
-# =========================
-# UPLOAD IMAGE
-# =========================
+# =========================================================
+# IMAGE UPLOAD
+# =========================================================
 
 uploaded_pic = st.file_uploader(
-    "📸 Gửi ảnh đề toán",
+    "📸 Gửi ảnh bài toán",
     type=["jpg", "jpeg", "png"]
 )
 
@@ -140,17 +218,23 @@ img = None
 
 if uploaded_pic:
 
-    img = Image.open(uploaded_pic)
+    try:
 
-    st.image(
-        img,
-        caption="Ảnh đề bài",
-        use_container_width=True
-    )
+        img = Image.open(uploaded_pic)
 
-# =========================
-# SHOW OLD CHAT
-# =========================
+        st.image(
+            img,
+            caption="Ảnh đề bài",
+            use_container_width=True
+        )
+
+    except Exception as e:
+
+        st.error(f"❌ Lỗi đọc ảnh: {e}")
+
+# =========================================================
+# SHOW CHAT HISTORY
+# =========================================================
 
 for msg in st.session_state.messages:
 
@@ -158,23 +242,31 @@ for msg in st.session_state.messages:
 
         st.markdown(msg["content"])
 
-# =========================
+# =========================================================
 # CHAT INPUT
-# =========================
+# =========================================================
 
-prompt = st.chat_input("Nhập câu hỏi...")
+prompt = st.chat_input(
+    "✍️ Nhập câu hỏi của em..."
+)
+
+# =========================================================
+# PROCESS CHAT
+# =========================================================
 
 if prompt:
 
-    # thêm mode vào prompt
     final_prompt = f"""
-Chế độ: {mode}
+Chế độ trả lời: {mode}
 
 Câu hỏi học sinh:
 {prompt}
 """
 
-    # hiện user
+    # -----------------------------------------------------
+    # USER MESSAGE
+    # -----------------------------------------------------
+
     st.session_state.messages.append({
         "role": "user",
         "content": prompt
@@ -184,10 +276,13 @@ Câu hỏi học sinh:
 
         st.markdown(prompt)
 
-    # AI trả lời
+    # -----------------------------------------------------
+    # AI RESPONSE
+    # -----------------------------------------------------
+
     with st.chat_message("assistant"):
 
-        with st.spinner("Đang giải bài..."):
+        with st.spinner("📚 Thầy đang giải bài..."):
 
             try:
 
@@ -197,12 +292,13 @@ Câu hỏi học sinh:
                 if img:
                     content.append(img)
 
-                # thêm PDF
-                content.extend(
-                    st.session_state.docs
-                )
+                # thêm PDF knowledge
+                if len(st.session_state.docs) > 0:
+                    content.extend(
+                        st.session_state.docs
+                    )
 
-                # CHAT MEMORY
+                # chat memory
                 response = (
                     st.session_state.chat
                     .send_message(content)
@@ -212,6 +308,7 @@ Câu hỏi học sinh:
 
                 st.markdown(answer)
 
+                # lưu lịch sử
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": answer
@@ -219,4 +316,21 @@ Câu hỏi học sinh:
 
             except Exception as e:
 
-                st.error(f"Lỗi: {e}")
+                error_msg = f"""
+❌ Đã xảy ra lỗi:
+
+{e}
+
+💡 Gợi ý:
+- Kiểm tra API KEY
+- Kiểm tra quota Gemini
+- Kiểm tra kích thước ảnh
+- Kiểm tra file PDF
+"""
+
+                st.error(error_msg)
+
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": error_msg
+                })
